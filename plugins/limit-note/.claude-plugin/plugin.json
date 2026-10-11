@@ -1,0 +1,17 @@
+{
+  "name": "limit-note",
+  "version": "0.1.0",
+  "description": "A phone push when your Claude subscription limit reaches 99%, with an \"out of Claude limits, ping me at 3:40 pm\" status ready to paste. Spends no tokens",
+  "author": {
+    "name": "matthlh"
+  },
+  "homepage": "https://github.com/matthlh/claude-mods/tree/main/plugins/limit-note",
+  "repository": "https://github.com/matthlh/claude-mods",
+  "license": "MIT",
+  "keywords": [
+    "mod",
+    "rate-limits",
+    "notifications",
+    "ntfy"
+  ]
+}

@@ -3,7 +3,7 @@
   "owner": {
     "name": "matthlh"
   },
-  "description": "Claude Code mods by matthlh: a pixel cat, an idle game and a purple theme",
+  "description": "Claude Code mods by matthlh: a pixel cat, an idle game, a purple theme and a usage-limit alert",
   "plugins": [
     {
       "name": "pixel-cat",
@@ -36,6 +36,17 @@
         "theme",
         "dark",
         "purple"
+      ]
+    },
+    {
+      "name": "limit-note",
+      "source": "./plugins/limit-note",
+      "description": "A phone push when your Claude subscription limit reaches 99%, with an \"out of Claude limits, ping me at 3:40 pm\" status ready to paste. Spends no tokens",
+      "category": "productivity",
+      "tags": [
+        "mod",
+        "rate-limits",
+        "notifications"
       ]
     }
   ]
