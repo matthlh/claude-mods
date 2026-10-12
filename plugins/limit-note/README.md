@@ -6,7 +6,7 @@ When your Claude subscription reaches 99% of its 5-hour or weekly limit, Limit N
 
 The time is when the limit resets, in Pacific time, with the weekday when it is not today ("Ping me Tue 9 am PT pls"). The text stays under 60 characters, so it fits an Instagram Note.
 
-Turned on, it posts that text as your Instagram Note by itself, through instagram.com in a Chrome profile of its own, and a push to your phone says the Note is up. Left off, the push carries the text and tapping it opens Instagram's inbox.
+Turned on, it posts that text as your Instagram Note by itself, through instagram.com in a Chrome profile of its own, takes the Note down again once the limit resets, and a push to your phone says the Note is up. Left off, the push carries the text and tapping it opens Instagram's inbox.
 
 It spends no tokens. Claude Code already measures your limits after every reply, and Limit Note only reads those numbers; it never calls the model.
 
@@ -28,6 +28,7 @@ Anyone who knows the topic can read or send to it, so keep it out of anything pu
 | `/limit-note test` | Sends a test push; `/limit-note test github` also sets a GitHub status that clears in 2 minutes |
 | `/limit-note instagram-login` | Opens the Chrome profile the Instagram auto-post uses, for you to sign in once |
 | `/limit-note test instagram` | Goes as far as the Note composer and stops before Share; `/limit-note test instagram live` posts for real |
+| `/limit-note test instagram clear` | Goes as far as "Delete note" on a Note of ours and stops; `/limit-note test instagram clear live` deletes it |
 
 ## When it fires
 
@@ -64,6 +65,10 @@ Instagram has no official way for an app to set a Note, so this drives instagram
 4. When you want to see a real post, run `/limit-note test instagram live`. It posts the test text as your Note; delete it in Instagram afterwards if you like.
 
 The Note goes to Instagram's default audience, "followers you follow back"; Limit Note never changes it. On the web the composer sits in the inbox page itself: pressing the "Your note" bubble opens a "What's new..." box with a Share button.
+
+When the limit the Note was for resets, Limit Note deletes the Note, but only one that still starts with "Out of Claude"; a Note you set yourself in the meantime is left alone. It looks after each reply and every 5 minutes while Claude Code is open, so the Note comes down within about 5 minutes of the reset; if Claude Code is closed then, it comes down the next time Claude Code opens. A take-down that fails is tried three times, ten minutes apart.
+
+Only your own Note bubble is ever pressed: it reads "Your note" when empty and the Note's text when not. Pressing anyone else's Note would open a reply to them, so a bubble it cannot tell is yours is a failure, never a guess.
 
 At 99%, the post runs in a headless Chrome with no window, takes about 10 to 30 seconds, and closes when done. Chrome is driven over the DevTools protocol on a pipe, so no debugging port is opened, and the script needs no packages. If you are signed out or Instagram shows a security check, the push says so; run `/limit-note instagram-login` again and sign in.
 

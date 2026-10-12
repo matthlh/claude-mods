@@ -4,18 +4,25 @@
 //
 //   node instagram-note.mjs login --chrome <path> --profile <dir>
 //   node instagram-note.mjs post --chrome <path> --profile <dir> --text <note> [--dry-run]
+//   node instagram-note.mjs clear --chrome <path> --profile <dir> [--dry-run]
 //
 // `login` opens the profile in a normal window for the person to sign in by
 // hand; nothing here ever types a password or answers a security check.
 // `post` prints one JSON line, { ok, reason?, steps }, and exits 0 when the
 // Note is up (or, with --dry-run, when the composer is ready and Share was not
 // pressed); 2 signed out or a security check, 3 the page is not as expected,
-// 4 out of time, 5 the login window is still open, 1 anything else.
+// 4 out of time, 5 the login window is still open, 1 anything else. `clear`
+// deletes the Note only when it is one of ours (it starts "Out of Claude"),
+// and exits 0 too when no Note of ours is up.
+//
+// Only the person's own bubble is ever pressed: it reads "Your note" when
+// empty and its Note's text when not. Pressing anyone else's opens a reply.
 import { execFileSync, spawn } from 'node:child_process'
 import { mkdirSync, readlinkSync } from 'node:fs'
 
 const DEADLINE_MS = 90_000
 const INBOX = 'https://www.instagram.com/direct/inbox/'
+const OURS = /^Out of Claude\b/
 const BLOCKED = /\/accounts\/login|\/challenge|\/checkpoint|two_factor|\/accounts\/suspended|\/accounts\/disabled/
 
 const [mode, ...rest] = process.argv.slice(2)
@@ -31,7 +38,8 @@ class Stop extends Error {
 
 process.on('uncaughtException', fail)
 if (mode === 'login') login()
-else if (mode === 'post') post().catch(fail)
+else if (mode === 'post') drive(setNote).catch(fail)
+else if (mode === 'clear') drive(clearNote).catch(fail)
 else finish(1, `unknown mode ${mode}`)
 
 function flags(list) {
@@ -80,9 +88,9 @@ function owner(profile) {
   }
 }
 
-async function post() {
+async function drive(task) {
   const profile = profileDir()
-  if (!opt.text) throw new Stop(1, '--text is required')
+  if (task === setNote && !opt.text) throw new Stop(1, '--text is required')
   const held = owner(profile)
   if (held) {
     // A headless run of ours that was cut off is cleared; the login window is
@@ -109,7 +117,7 @@ async function post() {
     await page('Page.enable')
     await page('Accessibility.enable')
     await page('Page.navigate', { url: INBOX })
-    await setNote(page)
+    await task(page)
   } finally {
     clearTimeout(timer)
     await cdp.send('Browser.close').catch(() => {})
@@ -119,43 +127,11 @@ async function post() {
 }
 
 async function setNote(page) {
-  const evaluate = async expression => (await page('Runtime.evaluate', { expression, returnByValue: true, awaitPromise: true })).result.value
-
-  // The inbox, signed in, with the Notes row showing.
-  const yourNote = await until(30_000, 'the inbox never showed "Your note"', async () => {
-    const href = await evaluate('location.href')
-    if (BLOCKED.test(href)) {
-      const where = new URL(href).pathname
-      throw new Stop(2, where.startsWith('/accounts/login') ? 'signed out of Instagram' : `Instagram asked for a security check (${where})`)
-    }
-    const buttons = await axButtons(page)
-    const notNow = buttons.find(b => /^not now$/i.test(b.name))
-    if (notNow) {
-      // The "Turn on notifications" prompt: decline it.
-      await click(page, notNow.id)
-      steps.push('Declined a notifications prompt.')
-      return undefined
-    }
-    // Its name is the bubble's prompt and then "Your note" ("What's new... Your note").
-    return buttons.find(b => /(^|\s)Your note$/.test(b.name))
-  }).catch(async err => {
-    // What the page showed instead, without anyone's name in it.
-    const seen = await evaluate(`(() => ({
-      path: location.pathname,
-      title: document.title,
-      signInForm: !!document.querySelector('input[type=password]'),
-      buttons: document.querySelectorAll('button, [role=button]').length,
-      headless: /Headless/.test(navigator.userAgent),
-      noteLabels: [...document.querySelectorAll('[aria-label], button, [role=button]')]
-        .map(el => (el.getAttribute('aria-label') || el.innerText || '').trim().slice(0, 40))
-        .filter(t => /note/i.test(t)).slice(0, 8),
-    }))()`).catch(() => undefined)
-    if (seen) steps.push(`The page showed: ${JSON.stringify(seen)}`)
-    throw err
-  })
+  const evaluate = evaluator(page)
+  const bubble = await ownBubble(page, evaluate)
   steps.push('Opened the inbox, signed in.')
-  await click(page, yourNote.id)
-  steps.push('Pressed "Your note".')
+  await click(page, bubble.id)
+  steps.push(OURS.test(bubble.name) ? 'Pressed your Note bubble, which holds an earlier Note of ours.' : 'Pressed "Your note".')
 
   let state = await until(10_000, 'pressing "Your note" opened no composer', async () => {
     const c = await composer(evaluate)
@@ -201,6 +177,96 @@ async function setNote(page) {
     return c?.box ? undefined : true
   })
   steps.push('The composer closed: the Note is up.')
+}
+
+function evaluator(page) {
+  return async expression => (await page('Runtime.evaluate', { expression, returnByValue: true, awaitPromise: true })).result.value
+}
+
+// The inbox, signed in, and the person's own Note bubble in it.
+async function ownBubble(page, evaluate) {
+  return until(30_000, 'the inbox never showed your Note bubble', async () => {
+    const href = await evaluate('location.href')
+    if (BLOCKED.test(href)) {
+      const where = new URL(href).pathname
+      throw new Stop(2, where.startsWith('/accounts/login') ? 'signed out of Instagram' : `Instagram asked for a security check (${where})`)
+    }
+    const buttons = await axButtons(page)
+    const notNow = buttons.find(b => /^not now$/i.test(b.name))
+    if (notNow) {
+      // The "Turn on notifications" prompt: decline it.
+      await click(page, notNow.id)
+      steps.push('Declined a notifications prompt.')
+      return undefined
+    }
+    // Empty it reads "What's new... Your note"; holding one of ours, the
+    // Note's text and then the person's name.
+    return buttons.find(b => /(^|\s)Your note$/.test(b.name) || OURS.test(b.name))
+  }).catch(async err => {
+    // What the page showed instead, without anyone else's name in it.
+    const seen = await evaluate(`(() => ({
+      path: location.pathname,
+      title: document.title,
+      signInForm: !!document.querySelector('input[type=password]'),
+      buttons: document.querySelectorAll('button, [role=button]').length,
+      headless: /Headless/.test(navigator.userAgent),
+      bubbles: [...document.querySelectorAll('[aria-label], button, [role=button]')]
+        .map(el => (el.getAttribute('aria-label') || el.innerText || '').trim().slice(0, 80))
+        .filter(t => /Your note$|^Out of Claude/.test(t)).slice(0, 4),
+    }))()`).catch(() => undefined)
+    if (seen) steps.push(`The page showed: ${JSON.stringify(seen)}`)
+    throw err
+  })
+}
+
+async function clearNote(page) {
+  const evaluate = evaluator(page)
+  const bubble = await ownBubble(page, evaluate)
+  if (!OURS.test(bubble.name)) {
+    steps.push('No Note of ours is up; nothing to remove.')
+    return
+  }
+  steps.push('Opened the inbox, signed in; a Note of ours is up.')
+  await click(page, bubble.id)
+  steps.push('Pressed your Note bubble.')
+  const remove = await until(10_000, 'pressing your Note showed no "Delete note"', () => pageButton(evaluate, /^delete note$/i)).catch(async err => {
+    const seen = await evaluate(`[...document.querySelectorAll('button, [role=button]')]
+      .map(el => (el.getAttribute('aria-label') || el.innerText || '').trim().slice(0, 40))
+      .filter(t => /note|delete|remove/i.test(t)).slice(0, 8)`).catch(() => undefined)
+    if (seen) steps.push(`The page showed these buttons: ${JSON.stringify(seen)}`)
+    throw err
+  })
+  steps.push(`Found "${remove.name}".`)
+  if (opt.dryRun) {
+    steps.push('Dry run: stopped before deleting; your Note is still up.')
+    return
+  }
+  await clickAt(page, remove)
+  steps.push(`Pressed "${remove.name}".`)
+  // Instagram may ask to confirm.
+  const confirm = await until(5_000, 'no confirmation', () => pageButton(evaluate, /^delete$/i)).catch(() => undefined)
+  if (confirm) {
+    await clickAt(page, confirm)
+    steps.push('Confirmed.')
+  }
+  await until(15_000, 'your Note was still up after deleting it', async () => {
+    const own = (await axButtons(page)).find(b => /(^|\s)Your note$/.test(b.name) || OURS.test(b.name))
+    return own && !OURS.test(own.name) ? true : undefined
+  })
+  steps.push('Your Note is gone.')
+}
+
+// A shown button whose label matches, the topmost layer first.
+function pageButton(evaluate, pattern) {
+  return evaluate(`(() => {
+    const re = new RegExp(${JSON.stringify(pattern.source)}, 'i')
+    const label = el => (el.getAttribute('aria-label') || el.innerText || '').trim()
+    const el = [...document.querySelectorAll('button, [role=button]')].reverse()
+      .find(el => { const r = el.getBoundingClientRect(); return r.width > 0 && r.height > 0 && re.test(label(el)) })
+    if (!el) return null
+    const r = el.getBoundingClientRect()
+    return { x: r.x + r.width / 2, y: r.y + r.height / 2, name: label(el).slice(0, 40) }
+  })()`)
 }
 
 // The Note composer: its text box, what it holds, its Share button, and its
