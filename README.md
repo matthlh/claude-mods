@@ -7,7 +7,7 @@ Four plugins for [Claude Code](https://claude.com/claude-code), served from one 
 | [`pixel-cat`](plugins/pixel-cat) | A little pixel cat that wanders above the prompt, watches your usage limits and announces when work finishes. Not a cat person? Switch packs and an adventurer mines, chops trees and fights zombies there instead |
 | [`token-tycoon`](plugins/token-tycoon) | A Claude-themed idle game: prompt to earn tokens, hire agents, upgrade models and infra, and earn from your real Claude Code usage |
 | [`purple-dark`](plugins/purple-dark) | A purple dark colour theme |
-| [`limit-note`](plugins/limit-note) | Posts "out of Claude limits, ping me at 3:40 pm" as your Instagram Note when your Claude limit reaches 99%, with a phone push. Spends no tokens |
+| [`limit-note`](plugins/limit-note) | Posts "Out of Claude Tokens; Ping me 3:40 pm PT pls" as your Instagram Note when your Claude limit reaches 99%, with a phone push. Spends no tokens |
 
 ## Install
 
@@ -84,7 +84,7 @@ A purple take on the dark theme: lavender accent, violet borders, deep purple me
 
 ### Limit Note ⏳
 
-When your 5-hour or weekly limit reaches 99%, it posts "Out of Claude limits, ping me at 3:40 pm PT" as your Instagram Note, the time being when the limit resets, and an [ntfy](https://ntfy.sh) push tells your phone. The Instagram post is opt-in; without it the push carries the text. It can also set your GitHub status. It fires once per limit window across every open session and only reads the usage numbers Claude Code already has, so it costs no tokens. Run `/limit-note setup`, subscribe to the topic it prints, then `/limit-note test`. [Read more](plugins/limit-note/README.md).
+When your 5-hour or weekly limit reaches 99%, it posts "Out of Claude Tokens; Ping me 3:40 pm PT pls" as your Instagram Note, the time being when the limit resets, and an [ntfy](https://ntfy.sh) push tells your phone. The Instagram post is opt-in; without it the push carries the text. It can also set your GitHub status. It fires once per limit window across every open session and only reads the usage numbers Claude Code already has, so it costs no tokens. Run `/limit-note setup`, subscribe to the topic it prints, then `/limit-note test`. [Read more](plugins/limit-note/README.md).
 
 ## Run from a clone
 

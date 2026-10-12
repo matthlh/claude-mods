@@ -6,28 +6,28 @@ const NOW = Date.parse('2026-10-11T19:00:00Z')
 const at = (iso: string) => Date.parse(iso)
 
 test('the status text names the time in Pacific time, minutes only when not on the hour', () => {
-  expect(noteFor(at('2026-10-11T22:40:00Z'), NOW)).toBe('Out of Claude limits, ping me at 3:40 pm PT')
-  expect(noteFor(at('2026-10-11T22:00:00Z'), NOW)).toBe('Out of Claude limits, ping me at 3 pm PT')
-  expect(noteFor(at('2026-10-11T19:05:00Z'), NOW)).toBe('Out of Claude limits, ping me at 12:05 pm PT')
+  expect(noteFor(at('2026-10-11T22:40:00Z'), NOW)).toBe('Out of Claude Tokens; Ping me 3:40 pm PT pls')
+  expect(noteFor(at('2026-10-11T22:00:00Z'), NOW)).toBe('Out of Claude Tokens; Ping me 3 pm PT pls')
+  expect(noteFor(at('2026-10-11T19:05:00Z'), NOW)).toBe('Out of Claude Tokens; Ping me 12:05 pm PT pls')
 })
 
 test('a reset on another day names the weekday, and a week or more out the date', () => {
-  expect(noteFor(at('2026-10-13T16:00:00Z'), NOW)).toBe('Out of Claude limits, ping me Tue at 9 am PT')
+  expect(noteFor(at('2026-10-13T16:00:00Z'), NOW)).toBe('Out of Claude Tokens; Ping me Tue 9 am PT pls')
   // 11:30 pm Sunday to 1 am Monday is tomorrow, though under two hours away.
-  expect(noteFor(at('2026-10-12T08:00:00Z'), at('2026-10-12T06:30:00Z'))).toBe('Out of Claude limits, ping me Mon at 1 am PT')
+  expect(noteFor(at('2026-10-12T08:00:00Z'), at('2026-10-12T06:30:00Z'))).toBe('Out of Claude Tokens; Ping me Mon 1 am PT pls')
   // Same weekday a week on: a bare "Sun" would read as today.
-  expect(noteFor(at('2026-10-18T19:00:00Z'), NOW)).toBe('Out of Claude limits, ping me Oct 18 at 12 pm PT')
+  expect(noteFor(at('2026-10-18T19:00:00Z'), NOW)).toBe('Out of Claude Tokens; Ping me Oct 18 12 pm PT pls')
 })
 
 test('the time follows Vancouver, which keeps daylight time from Nov 2026 where Los Angeles does not', () => {
   // tzdata 2026b: B.C. stays on UTC-7 year-round, so 01:00 UTC is 6 pm, not 5.
-  expect(noteFor(at('2026-11-02T01:00:00Z'), at('2026-11-01T19:00:00Z'))).toBe('Out of Claude limits, ping me at 6 pm PT')
-  expect(noteFor(at('2027-01-15T20:00:00Z'), at('2027-01-15T18:00:00Z'))).toBe('Out of Claude limits, ping me at 1 pm PT')
+  expect(noteFor(at('2026-11-02T01:00:00Z'), at('2026-11-01T19:00:00Z'))).toBe('Out of Claude Tokens; Ping me 6 pm PT pls')
+  expect(noteFor(at('2027-01-15T20:00:00Z'), at('2027-01-15T18:00:00Z'))).toBe('Out of Claude Tokens; Ping me 1 pm PT pls')
 })
 
 test('every text fits an Instagram Note', () => {
   const longest = noteFor(at('2026-10-20T19:50:00Z'), NOW)
-  expect(longest).toBe('Out of Claude limits, ping me Oct 20 at 12:50 pm PT')
+  expect(longest).toBe('Out of Claude Tokens; Ping me Oct 20 12:50 pm PT pls')
   expect(longest.length).toBeLessThan(60)
   expect(NOTE_FALLBACK.length).toBeLessThan(60)
 })
@@ -47,7 +47,7 @@ test('a reading that resets within ten minutes or already has is stale and skipp
   expect(pickTrigger([{ kind: 'five_hour', percentUsed: 100, resetsAt: '2026-10-11T19:09:00Z' }], NOW)).toBeUndefined()
   expect(pickTrigger([{ kind: 'five_hour', percentUsed: 100, resetsAt: '2026-10-11T18:00:00Z' }], NOW)).toBeUndefined()
   expect(pickTrigger([{ kind: 'five_hour', percentUsed: 100, resetsAt: '2026-10-11T19:11:00Z' }], NOW)?.note).toBe(
-    'Out of Claude limits, ping me at 12:11 pm PT',
+    'Out of Claude Tokens; Ping me 12:11 pm PT pls',
   )
 })
 
@@ -64,7 +64,7 @@ test('the back time is the latest reset among the windows at the limit', () => {
     percentUsed: 99,
     backAt: at('2026-10-13T16:00:00Z'),
     until: at('2026-10-13T16:00:00Z'),
-    note: 'Out of Claude limits, ping me Tue at 9 am PT',
+    note: 'Out of Claude Tokens; Ping me Tue 9 am PT pls',
   })
   // A window under the limit does not set the time, however late it resets.
   const five = pickTrigger(

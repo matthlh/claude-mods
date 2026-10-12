@@ -41,7 +41,7 @@
     {
       "name": "limit-note",
       "source": "./plugins/limit-note",
-      "description": "Posts \"out of Claude limits, ping me at 3:40 pm\" as your Instagram Note when your Claude limit reaches 99%, with a phone push. Spends no tokens",
+      "description": "Posts \"Out of Claude Tokens; Ping me 3:40 pm PT pls\" as your Instagram Note when your Claude limit reaches 99%, with a phone push. Spends no tokens",
       "category": "productivity",
       "tags": [
         "mod",

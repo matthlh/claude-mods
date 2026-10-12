@@ -2,7 +2,7 @@ import { test, expect } from 'claude-code/testing'
 import { CONFIG, DIR, RUN, SENT, config, fakeHost, header } from './host'
 
 const FIVE = '2026-10-11T22:40:00Z' // 3:40 pm PT today
-const NOTE = 'Out of Claude limits, ping me at 3:40 pm PT'
+const NOTE = 'Out of Claude Tokens; Ping me 3:40 pm PT pls'
 const PROFILE = `${DIR}/chrome-profile`
 
 async function start($: any) {
@@ -75,7 +75,7 @@ test('/limit-note test instagram stops before Share and sends no push; live post
 
   expect(await command('test instagram')).toContain('stopped before pressing Share')
   expect(host.scripts[0]).toContain('--dry-run')
-  expect(host.scripts[0]).toContain('Out of Claude limits, ping me at 3 pm PT')
+  expect(host.scripts[0]).toContain('Out of Claude Tokens; Ping me 3 pm PT pls')
   expect(host.pushes).toEqual([])
 
   await command('test instagram live')

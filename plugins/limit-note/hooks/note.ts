@@ -11,7 +11,7 @@ export const MIN_LEAD_MS = 10 * 60_000
 // How long an alert stays sent when the reading gave no reset time.
 export const FALLBACK_HOLD_MS = 5 * 60 * 60_000
 export const ZONE = 'America/Vancouver'
-export const NOTE_FALLBACK = 'Out of Claude limits, ping me later'
+export const NOTE_FALLBACK = 'Out of Claude Tokens; Ping me later pls'
 
 export type Trigger = {
   /** The window that sets the back time; alerts are deduped on it. */
@@ -52,13 +52,13 @@ export function pickTrigger(limits: readonly SessionRateLimit[], now: number, th
   return { kind: last.kind, percentUsed: last.percentUsed, backAt: last.at!, until: last.at!, note: noteFor(last.at!, now) }
 }
 
-/** "Out of Claude limits, ping me at 3:40 pm PT", with the day when not today. */
+/** "Out of Claude Tokens; Ping me 3:40 pm PT pls", with the day when not today. */
 export function noteFor(at: number, now: number): string {
-  return `Out of Claude limits, ping me ${backText(at, now)}`
+  return `Out of Claude Tokens; Ping me ${backText(at, now)} pls`
 }
 
 /**
- * "at 3:40 pm PT" today, "Tue at 3 pm PT" within the week, "Oct 18 at 3 pm PT"
+ * "3:40 pm PT" today, "Tue 3 pm PT" within the week, "Oct 18 3 pm PT"
  * past it (a weekday alone would read as today a week out).
  */
 export function backText(at: number, now: number): string {
@@ -66,7 +66,7 @@ export function backText(at: number, now: number): string {
   const time = `${p.hour}${p.minute === '00' ? '' : `:${p.minute}`} ${(p.dayPeriod ?? '').toLowerCase()}`
   const days = dayNumber(parts(at)) - dayNumber(parts(now))
   const day = days <= 0 ? '' : days < 7 ? `${p.weekday} ` : `${p.month} ${p.day} `
-  return `${day}at ${time} PT`
+  return `${day}${time} PT`
 }
 
 export function kindLabel(kind: string): string {

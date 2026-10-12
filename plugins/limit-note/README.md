@@ -2,9 +2,9 @@
 
 When your Claude subscription reaches 99% of its 5-hour or weekly limit, Limit Note puts up a status text:
 
-> Out of Claude limits, ping me at 3:40 pm PT
+> Out of Claude Tokens; Ping me 3:40 pm PT pls
 
-The time is when the limit resets, in Pacific time, with the weekday when it is not today ("ping me Tue at 9 am PT"). The text stays under 60 characters, so it fits an Instagram Note.
+The time is when the limit resets, in Pacific time, with the weekday when it is not today ("Ping me Tue 9 am PT pls"). The text stays under 60 characters, so it fits an Instagram Note.
 
 Turned on, it posts that text as your Instagram Note by itself, through instagram.com in a Chrome profile of its own, and a push to your phone says the Note is up. Left off, the push carries the text and tapping it opens Instagram's inbox.
 
@@ -34,7 +34,7 @@ Anyone who knows the topic can read or send to it, so keep it out of anything pu
 - It fires when a 5-hour or weekly reading is at 99% or more. A burst of replies can jump straight from 98 to 100, so it never waits for exactly 99.
 - The time in the text is the latest reset among the limits that are full.
 - It skips a reading whose reset is less than 10 minutes away or already past. A session that sat idle while you used claude.ai can hold an old reading.
-- If a full limit gave no reset time, the text is "Out of Claude limits, ping me later".
+- If a full limit gave no reset time, the text is "Out of Claude Tokens; Ping me later pls".
 - It fires once per limit window across every open Claude Code session. Sessions share a lock folder and a record of what was sent under `~/.config/limit-note/`. When the weekly limit fills after the 5-hour one, you get a second push with the later time.
 - A push that fails (no network, say) is not recorded, so the next reading tries again. A Note that went up counts as delivered even when its push was lost.
 
