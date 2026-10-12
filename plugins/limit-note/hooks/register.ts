@@ -1,5 +1,5 @@
 // limit-note: when a Claude subscription limit reaches 99%, put up the status
-// text "Out of Claude limits, ping me at 3:40 pm PT", once per window across
+// text "Out of Claude Tokens; Ping me 3:40 pm PT pls", once per window across
 // every open session. Turned on, it posts that text as the person's Instagram
 // Note itself (scripts/instagram-note.mjs, a headless Chrome in a profile of
 // its own) and sets their GitHub status; either way an ntfy push tells their
@@ -234,7 +234,7 @@ async function status($: EngineInterface): Promise<string> {
   if (rateLimits.length === 0) lines.push('No limit readings yet in this session.')
   const sent = await readSent($, p.sent, now)
   for (const [kind, until] of Object.entries(sent)) {
-    lines.push(`Alert for the ${kindLabel(kind)} limit already sent, holds until ${backText(until, now).replace(/^at /, '')}.`)
+    lines.push(`Alert for the ${kindLabel(kind)} limit already sent, holds until ${backText(until, now)}.`)
   }
   return lines.join('\n')
 }

@@ -24,7 +24,7 @@ test('a 99% reading pushes the status text once, and later readings stay quiet',
   const push = host.pushes[0]!
   expect(push.argv[0]).toBe('/usr/bin/curl')
   expect(push.argv[push.argv.length - 1]).toBe('https://ntfy.sh/ln-test')
-  expect(push.body).toBe('Out of Claude limits, ping me at 3:40 pm PT')
+  expect(push.body).toBe('Out of Claude Tokens; Ping me 3:40 pm PT pls')
   expect(header(push, 'Title')).toBe('Claude 5-hour limit at 99.4%')
   expect(header(push, 'Click')).toBe('instagram://direct-inbox')
   expect(push.timeoutMs).toBeGreaterThan(0)
@@ -68,8 +68,8 @@ test('the weekly limit joining later pushes again with the later time', async ($
   await measure([{ kind: 'five_hour', percentUsed: 99, resetsAt: FIVE }])
   await measure([{ kind: 'five_hour', percentUsed: 99, resetsAt: FIVE }, { kind: 'seven_day', percentUsed: 99, resetsAt: SEVEN }])
   expect(host.pushes.map(p => p.body)).toEqual([
-    'Out of Claude limits, ping me at 3:40 pm PT',
-    'Out of Claude limits, ping me Tue at 9 am PT',
+    'Out of Claude Tokens; Ping me 3:40 pm PT pls',
+    'Out of Claude Tokens; Ping me Tue 9 am PT pls',
   ])
   expect(header(host.pushes[1]!, 'Title')).toBe('Claude weekly limit at 99%')
 })
@@ -81,8 +81,8 @@ test('the next window pushes again once the last one has reset', async ($: any, 
   await host.clock.set(Date.parse('2026-10-12T02:00:00Z')) // 7 pm PT
   await measure([{ kind: 'five_hour', percentUsed: 99.2, resetsAt: '2026-10-12T05:00:00Z' }])
   expect(host.pushes.map(p => p.body)).toEqual([
-    'Out of Claude limits, ping me at 3:40 pm PT',
-    'Out of Claude limits, ping me at 10 pm PT',
+    'Out of Claude Tokens; Ping me 3:40 pm PT pls',
+    'Out of Claude Tokens; Ping me 10 pm PT pls',
   ])
 })
 
@@ -125,7 +125,7 @@ test('the GitHub status, when on, expires when the window resets', async ($: any
   expect(host.gh.length).toBe(1)
   const gh = host.gh[0]!
   expect(gh.slice(0, 3)).toEqual(['/usr/local/bin/gh', 'api', 'graphql'])
-  expect(gh).toContain('message=Out of Claude limits, ping me at 3:40 pm PT')
+  expect(gh).toContain('message=Out of Claude Tokens; Ping me 3:40 pm PT pls')
   expect(gh).toContain('expiresAt=2026-10-11T22:40:00.000Z')
   expect(gh.find(a => a.startsWith('query='))).toContain('changeUserStatus')
 })
@@ -145,7 +145,7 @@ test('/limit-note test pushes a made-up reading and holds back no real alert', a
   expect(text).toContain('Sent a test push')
   expect(host.pushes.length).toBe(1)
   expect(header(host.pushes[0]!, 'Title')).toBe('Test: Claude 5-hour limit at 99%')
-  expect(host.pushes[0]!.body).toBe('Out of Claude limits, ping me at 3 pm PT')
+  expect(host.pushes[0]!.body).toBe('Out of Claude Tokens; Ping me 3 pm PT pls')
   expect(host.files.has(SENT)).toBe(false)
   expect(host.gh).toEqual([])
 
@@ -186,8 +186,8 @@ test('/limit-note status reads the free usage call, never the counted breakdown'
   const { command } = await start($)
   const text = await command('')
   expect(text).toContain('Topic ln-test')
-  expect(text).toContain('5-hour limit: 42%, resets at 3:40 pm PT.')
-  expect(text).toContain('weekly limit already sent, holds until Tue at 9 am PT')
+  expect(text).toContain('5-hour limit: 42%, resets 3:40 pm PT.')
+  expect(text).toContain('weekly limit already sent, holds until Tue 9 am PT')
   expect(text).not.toContain('5-hour limit already sent')
   expect(host.usageArgs.every(a => (a as { breakdown?: unknown }).breakdown === undefined)).toBe(true)
   expect(await command('help')).toContain('/limit-note test')

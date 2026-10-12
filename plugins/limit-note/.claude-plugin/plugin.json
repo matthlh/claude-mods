@@ -1,7 +1,7 @@
 {
   "name": "limit-note",
-  "version": "0.2.0",
-  "description": "Posts \"out of Claude limits, ping me at 3:40 pm\" as your Instagram Note when your Claude limit reaches 99%, with a phone push. Spends no tokens",
+  "version": "0.3.0",
+  "description": "Posts \"Out of Claude Tokens; Ping me 3:40 pm PT pls\" as your Instagram Note when your Claude limit reaches 99%, with a phone push. Spends no tokens",
   "author": {
     "name": "matthlh"
   },
