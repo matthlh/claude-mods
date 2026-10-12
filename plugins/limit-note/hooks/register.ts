@@ -186,7 +186,7 @@ async function instagramLogin($: EngineInterface): Promise<string> {
   if (!opened.ok) return `Could not open the Chrome profile: ${opened.reason}`
   return [
     'A Chrome window opened at Instagram, in a profile only limit-note uses.',
-    'Sign in there yourself, then close that window.',
+    'Sign in there yourself, then quit that Chrome with Command-Q (closing the window leaves it running).',
     `Then set "instagram": true in ${p.config} and run /limit-note test instagram.`,
   ].join('\n')
 }

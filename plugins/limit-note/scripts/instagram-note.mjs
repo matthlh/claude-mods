@@ -88,7 +88,7 @@ async function post() {
     // A headless run of ours that was cut off is cleared; the login window is
     // the person's and is left alone.
     const command = execFileSync('/bin/ps', ['-o', 'command=', '-p', String(held)], { encoding: 'utf8' })
-    if (!command.includes('--headless')) throw new Stop(5, 'the Instagram login window is still open; close it and try again')
+    if (!command.includes('--headless')) throw new Stop(5, 'the Instagram sign-in Chrome is still running; quit it with Command-Q and try again')
     process.kill(held, 'SIGKILL')
     await sleep(1000)
   }
@@ -136,64 +136,97 @@ async function setNote(page) {
       steps.push('Declined a notifications prompt.')
       return undefined
     }
-    return buttons.find(b => b.name === 'Your note')
+    // Its name is the bubble's prompt and then "Your note" ("What's new... Your note").
+    return buttons.find(b => /(^|\s)Your note$/.test(b.name))
+  }).catch(async err => {
+    // What the page showed instead, without anyone's name in it.
+    const seen = await evaluate(`(() => ({
+      path: location.pathname,
+      title: document.title,
+      signInForm: !!document.querySelector('input[type=password]'),
+      buttons: document.querySelectorAll('button, [role=button]').length,
+      headless: /Headless/.test(navigator.userAgent),
+      noteLabels: [...document.querySelectorAll('[aria-label], button, [role=button]')]
+        .map(el => (el.getAttribute('aria-label') || el.innerText || '').trim().slice(0, 40))
+        .filter(t => /note/i.test(t)).slice(0, 8),
+    }))()`).catch(() => undefined)
+    if (seen) steps.push(`The page showed: ${JSON.stringify(seen)}`)
+    throw err
   })
   steps.push('Opened the inbox, signed in.')
   await click(page, yourNote.id)
   steps.push('Pressed "Your note".')
 
-  let composer = await until(10_000, 'pressing "Your note" opened no composer', async () => {
-    const d = await dialog(evaluate)
-    if (!d) return undefined
-    if (d.textboxes.length > 0) return d
+  let state = await until(10_000, 'pressing "Your note" opened no composer', async () => {
+    const c = await composer(evaluate)
+    if (c?.box) return c
     // A Note already up: start a new one.
-    const fresh = d.buttons.find(b => /new note/i.test(b.name))
-    if (fresh) {
-      await clickAt(page, fresh)
-      steps.push(`Pressed "${fresh.name}" over the Note already up.`)
+    if (c?.fresh) {
+      await clickAt(page, c.fresh)
+      steps.push(`Pressed "${c.fresh.name}" over the Note already up.`)
     }
     return undefined
+  }).catch(async err => {
+    const seen = await evaluate(`(() => ({
+      path: location.pathname,
+      dialogs: document.querySelectorAll('[role=dialog]').length,
+      textboxes: [...document.querySelectorAll('textarea, input[type=text], [contenteditable=true], [role=textbox]')]
+        .map(el => ({ tag: el.tagName, hint: el.getAttribute('placeholder') || el.getAttribute('aria-placeholder') || el.getAttribute('aria-label') || '' })),
+      share: [...document.querySelectorAll('button, [role=button]')].filter(el => /^share$/i.test((el.getAttribute('aria-label') || el.innerText || '').trim())).length,
+    }))()`).catch(() => undefined)
+    if (seen) steps.push(`The page showed: ${JSON.stringify(seen)}`)
+    throw err
   })
-  const box = composer.textboxes[0]
-  steps.push(`The composer opened; its text box reads "${box.placeholder}".`)
-  await clickAt(page, box)
+  steps.push(`The composer opened; its text box reads "${state.hint}".`)
+  await clickAt(page, state.box)
+  // Replace whatever the box held (a draft) rather than add to it.
+  await evaluate("document.execCommand('selectAll', false)")
   await page('Input.insertText', { text: opt.text })
   steps.push(`Typed "${opt.text}" (${[...opt.text].length} characters).`)
 
-  composer = await until(5_000, 'no Share button turned on after typing', async () => {
-    const d = await dialog(evaluate)
-    return d?.buttons.some(b => b.name === 'Share' && !b.disabled) ? d : undefined
+  state = await until(5_000, 'the Share button did not turn on after typing', async () => {
+    const c = await composer(evaluate)
+    return c?.box && c.share && !c.share.disabled && c.value === opt.text ? c : undefined
   })
-  steps.push(`The composer says: ${composer.text.replace(/\s+/g, ' ').trim()}`)
-  const share = composer.buttons.find(b => b.name === 'Share' && !b.disabled)
+  if (state.text) steps.push(`The composer says: ${state.text.replace(/\s+/g, ' ').trim()}`)
   if (opt.dryRun) {
     steps.push('Dry run: stopped before pressing Share; nothing was posted.')
     return
   }
-  await clickAt(page, share)
+  await clickAt(page, state.share)
   steps.push('Pressed Share.')
   await until(15_000, 'the composer stayed open after Share', async () => {
-    const d = await dialog(evaluate)
-    if (d && /couldn.t|try again|something went wrong/i.test(d.text)) throw new Stop(3, `Instagram said: ${d.text.slice(0, 120)}`)
-    return d && d.textboxes.length > 0 ? undefined : true
+    const c = await composer(evaluate)
+    if (c?.text && /couldn.t|try again|something went wrong/i.test(c.text)) throw new Stop(3, `Instagram said: ${c.text.slice(0, 120)}`)
+    return c?.box ? undefined : true
   })
   steps.push('The composer closed: the Note is up.')
 }
 
-// The newest dialog's text, text boxes and buttons, with where each sits.
-function dialog(evaluate) {
+// The Note composer: its text box, what it holds, its Share button, and its
+// text when small enough to be the composer alone (never the inbox's names).
+// It sits in the inbox page itself, not in a dialog.
+function composer(evaluate) {
   return evaluate(`(() => {
-    const d = [...document.querySelectorAll('[role=dialog]')].pop()
-    if (!d) return null
     const shown = el => { const r = el.getBoundingClientRect(); return r.width > 0 && r.height > 0 }
     const at = el => { const r = el.getBoundingClientRect(); return { x: r.x + r.width / 2, y: r.y + r.height / 2 } }
     const label = el => (el.getAttribute('aria-label') || el.innerText || '').trim().replace(/\\s+/g, ' ').slice(0, 80)
+    const hint = el => el.getAttribute('placeholder') || el.getAttribute('aria-placeholder') || el.getAttribute('aria-label') || ''
+    const buttons = [...document.querySelectorAll('button, [role=button]')].filter(shown)
+    const fresh = buttons.find(el => /new note/i.test(label(el)))
+    const boxes = [...document.querySelectorAll('textarea, input[type=text], [contenteditable=true], [role=textbox]')]
+      .filter(shown).filter(el => !/^search$/i.test(hint(el)))
+    const box = boxes.find(el => el.closest('[role=dialog]')) || boxes.find(el => /what.s new|thought|note/i.test(hint(el)))
+    if (!box) return fresh ? { fresh: { name: label(fresh), ...at(fresh) } } : null
+    const share = buttons.find(el => /^share$/i.test(label(el)))
+    let area = box
+    while (area.parentElement && area !== document.body && !(share && area.contains(share))) area = area.parentElement
     return {
-      text: d.innerText.slice(0, 600),
-      textboxes: [...d.querySelectorAll('textarea, input[type=text], [contenteditable=true], [role=textbox]')].filter(shown)
-        .map(el => ({ placeholder: el.getAttribute('placeholder') || el.getAttribute('aria-placeholder') || el.getAttribute('aria-label') || '', ...at(el) })),
-      buttons: [...d.querySelectorAll('button, [role=button]')].filter(shown)
-        .map(el => ({ name: label(el), disabled: el.disabled === true || el.getAttribute('aria-disabled') === 'true', ...at(el) })),
+      hint: hint(box),
+      box: at(box),
+      value: (box.value ?? box.innerText ?? '').trim(),
+      text: area !== document.body && area.innerText.length <= 300 ? area.innerText : '',
+      share: share ? { ...at(share), disabled: share.disabled === true || share.getAttribute('aria-disabled') === 'true' } : null,
     }
   })()`)
 }

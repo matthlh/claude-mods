@@ -58,10 +58,12 @@ Anyone who knows the topic can read or send to it, so keep it out of anything pu
 
 Instagram has no official way for an app to set a Note, so this drives instagram.com the way you would. It breaks Instagram's terms of use, Instagram may ask the account for a security check, and it stops working when Instagram changes the page. Every failure falls back to the push, which then carries the text and the reason.
 
-1. Run `/limit-note instagram-login`. A Chrome window opens at Instagram in a profile kept for this alone, in `~/.config/limit-note/chrome-profile` (readable only by you). Sign in there yourself, then close the window. Limit Note never types a password or answers a security check.
+1. Run `/limit-note instagram-login`. A Chrome window opens at Instagram in a profile kept for this alone, in `~/.config/limit-note/chrome-profile` (readable only by you). Sign in there yourself, then quit that Chrome with ⌘Q; closing the window alone leaves it running and holding the profile. Limit Note never types a password or answers a security check.
 2. Set `"instagram": true` in the config.
 3. Run `/limit-note test instagram`. It opens your inbox in a hidden Chrome, presses "Your note", types the text and stops before Share, then lists each step. Nothing is posted.
 4. When you want to see a real post, run `/limit-note test instagram live`. It posts the test text as your Note; delete it in Instagram afterwards if you like.
+
+The Note goes to Instagram's default audience, "followers you follow back"; Limit Note never changes it. On the web the composer sits in the inbox page itself: pressing the "Your note" bubble opens a "What's new..." box with a Share button.
 
 At 99%, the post runs in a headless Chrome with no window, takes about 10 to 30 seconds, and closes when done. Chrome is driven over the DevTools protocol on a pipe, so no debugging port is opened, and the script needs no packages. If you are signed out or Instagram shows a security check, the push says so; run `/limit-note instagram-login` again and sign in.
 
