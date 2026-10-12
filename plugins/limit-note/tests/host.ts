@@ -27,6 +27,10 @@ export type Host = {
   usageArgs: unknown[]
   /** curl's exit code for the next pushes; 0 succeeds. */
   curlExit: number
+  /** Each run of the Instagram script, by its arguments. */
+  scripts: string[][]
+  /** What the Instagram script exits with and prints. */
+  script: { exitCode: number; ok: boolean; reason?: string; steps: string[] }
 }
 
 export function config(extra: Record<string, unknown> = {}): string {
@@ -48,6 +52,8 @@ export function fakeHost(on: any, files: Record<string, string> = {}): Host {
     modelCalls: [],
     usageArgs: [],
     curlExit: 0,
+    scripts: [],
+    script: { exitCode: 0, ok: true, steps: ['Opened the inbox, signed in.'] },
   }
   const result = (exitCode = 0, stderr = '') => ({
     value: { exitCode, stdout: '', stderr, isStdoutTruncated: false, isStderrTruncated: false },
@@ -110,6 +116,11 @@ export function fakeHost(on: any, files: Record<string, string> = {}): Host {
       if (host.files.has(file)) return result(1, `sh: ${file}: cannot overwrite existing file`)
       host.files.set(file, e.init?.stdin ?? '')
       return result()
+    }
+    if (argv[1]?.endsWith('/scripts/instagram-note.mjs')) {
+      host.scripts.push(argv.slice(2))
+      const { exitCode, ...out } = host.script
+      return { value: { ...result(exitCode).value, stdout: `${JSON.stringify(out)}\n` } }
     }
     host.gh.push(argv)
     return result()
