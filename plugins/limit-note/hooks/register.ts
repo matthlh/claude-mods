@@ -2,8 +2,8 @@
 // text "Out of Claude Tokens; Ping me 3:40 pm PT pls", once per window across
 // every open session. Turned on, it posts that text as the person's Instagram
 // Note itself (scripts/instagram-note.mjs, a headless Chrome in a profile of
-// its own) and sets their GitHub status; either way an ntfy push tells their
-// phone what happened. It reads the limits the engine already measures and
+// its own), takes it down again once that limit resets, and sets their GitHub
+// status; either way an ntfy push tells their phone what happened. It reads the limits the engine already measures and
 // never calls the model.
 import type { EngineInterface, ProcessRunInit, ProcessRunResult, Register, SessionRateLimit } from 'claude-code'
 import { backText, kindLabel, pickTrigger } from './note'
@@ -37,6 +37,11 @@ const CURL = '/usr/bin/curl'
 const SEND_TIMEOUT_MS = 10_000
 // The script gives up at 90 s; this leaves it room to close Chrome.
 const INSTAGRAM_TIMEOUT_MS = 120_000
+// How often an open session looks for a Note whose limit has reset.
+const CLEAR_CHECK_MS = 5 * 60_000
+// After a failed take-down, the next try waits this long; three tries in all.
+const CLEAR_RETRY_MS = 10 * 60_000
+const CLEAR_TRIES = 3
 // A lock older than this belongs to a session that died mid-send.
 const STALE_LOCK_MS = 5 * 60_000
 const STORE_KEY = 'sent'
@@ -49,9 +54,12 @@ const HELP = [
   '/limit-note test sends a test push from a made-up 99% reading; add github to also try the GitHub status.',
   '/limit-note instagram-login opens the Chrome profile the Instagram auto-post uses, for you to sign in once.',
   '/limit-note test instagram goes as far as the Note composer and stops before Share; add live to post for real.',
+  '/limit-note test instagram clear goes as far as "Delete note" on a Note of ours; add live to delete it.',
 ].join('\n')
 
-type Paths = { dir: string; config: string; sent: string; lock: string; profile: string }
+type Paths = { dir: string; config: string; sent: string; lock: string; profile: string; note: string }
+/** The Note of ours that is up: when to take it down, and the failed tries so far. */
+type NoteUp = { until?: number; tries?: number; retryAt?: number }
 /** Until when each window's alert counts as sent, by window kind. */
 type Sent = Record<string, number>
 /** What the Instagram script reported: whether the Note is up, and each step. */
@@ -70,6 +78,13 @@ export const register: Register = on => {
       argumentHint: '[status | setup | test | instagram-login]',
       immediate: true,
     })
+    // A session sitting idle at the limit gets no readings, so the take-down
+    // is also looked for on a timer.
+    $.clock.every(CLEAR_CHECK_MS, () => {
+      void clearIfDue($)
+        .then(outcome => outcome === 'cleared' && $.ui.toast('Your Claude limit reset: took your Instagram Note down.'))
+        .catch(err => $.ui.log(`limit-note: ${String(err)}`, { to: 'debug' }))
+    })
     return started
   })
 
@@ -83,6 +98,7 @@ export const register: Register = on => {
         hasToldSetup = true
         $.ui.toast('Claude limits at 99%. Run /limit-note setup to get this on your phone.')
       } else if (outcome.startsWith('failed')) $.ui.log(`limit-note: push ${outcome}`, { to: 'debug' })
+      if ((await clearIfDue($)) === 'cleared') $.ui.toast('Your Claude limit reset: took your Instagram Note down.')
     } catch (err) {
       $.ui.log(`limit-note: ${String(err)}`, { to: 'debug' })
     }
@@ -95,6 +111,7 @@ export const register: Register = on => {
       if (verb === 'status') return { text: await status($) }
       if (verb === 'setup') return { text: await setup($) }
       if (verb === 'instagram-login') return { text: await instagramLogin($) }
+      if (verb === 'test' && rest.includes('instagram') && rest.includes('clear')) return { text: await testClear($, rest.includes('live')) }
       if (verb === 'test' && rest.includes('instagram')) return { text: await testInstagram($, rest.includes('live')) }
       if (verb === 'test') return { text: await sendTest($, rest.includes('github')) }
       return { text: HELP }
@@ -130,6 +147,7 @@ async function onReading($: EngineInterface, limits: readonly SessionRateLimit[]
     if (pushed !== 'ok' && posted?.ok !== true) return `failed: ${pushed}`
     sent[trigger.kind] = trigger.until
     await $.fs.write(p.sent, JSON.stringify(sent))
+    if (posted?.ok) await $.fs.write(p.note, JSON.stringify({ until: trigger.until }))
     await $.store.set(STORE_KEY, sent)
     if (cfg.github) {
       const set = await setGithubStatus($, cfg, trigger.note, trigger.until)
@@ -140,6 +158,39 @@ async function onReading($: EngineInterface, limits: readonly SessionRateLimit[]
   } finally {
     await run($, ['/bin/rmdir', p.lock])
   }
+}
+
+/** Once the limit a Note of ours was for has reset, take the Note down. */
+async function clearIfDue($: EngineInterface): Promise<'cleared' | `failed: ${string}` | undefined> {
+  const now = await $.clock.now()
+  const p = await paths($)
+  const due = (up: NoteUp) => up.until !== undefined && up.until <= now && (up.retryAt ?? 0) <= now
+  if (!due(await readNote($, p.note))) return undefined
+  const cfg = await readConfig($, p.config)
+  if (!cfg || !(await takeLock($, p.lock, now))) return undefined
+  try {
+    // Another session may have taken it down meanwhile.
+    const up = await readNote($, p.note)
+    if (!due(up)) return undefined
+    const cleared = await script($, cfg, ['clear', '--chrome', cfg.chrome, '--profile', p.profile], INSTAGRAM_TIMEOUT_MS)
+    const tries = (up.tries ?? 0) + 1
+    // Signed out or a changed page will not mend itself, so the tries are counted.
+    const next = cleared.ok || tries >= CLEAR_TRIES ? {} : { ...up, tries, retryAt: now + CLEAR_RETRY_MS }
+    await $.fs.write(p.note, JSON.stringify(next))
+    return cleared.ok ? 'cleared' : `failed: ${cleared.reason}`
+  } finally {
+    await run($, ['/bin/rmdir', p.lock])
+  }
+}
+
+/** `/limit-note test instagram clear [live]`: take a Note of ours down; without live it stops before deleting. */
+async function testClear($: EngineInterface, isLive: boolean): Promise<string> {
+  const p = await paths($)
+  const cfg = await readConfig($, p.config)
+  if (!cfg) return 'Not set up yet. Run /limit-note setup first.'
+  const args = ['clear', '--chrome', cfg.chrome, '--profile', p.profile, ...(isLive ? [] : ['--dry-run'])]
+  const cleared = await script($, cfg, args, INSTAGRAM_TIMEOUT_MS)
+  return [...cleared.steps, ...(cleared.ok ? [] : [`It failed: ${cleared.reason}.`])].join('\n')
 }
 
 /** `/limit-note test`: the same push from a made-up 99% reading. */
@@ -250,7 +301,7 @@ async function paths($: EngineInterface): Promise<Paths> {
   const home = await $.env.get('HOME')
   if (!home) throw new Error('HOME is not set')
   const dir = `${home}/.config/limit-note`
-  return { dir, config: `${dir}/config.json`, sent: `${dir}/sent.json`, lock: `${dir}/lock`, profile: `${dir}/chrome-profile` }
+  return { dir, config: `${dir}/config.json`, sent: `${dir}/sent.json`, lock: `${dir}/lock`, profile: `${dir}/chrome-profile`, note: `${dir}/note.json` }
 }
 
 async function readConfig($: EngineInterface, file: string): Promise<Config | undefined> {
@@ -326,6 +377,17 @@ async function readSent($: EngineInterface, file: string, now: number): Promise<
     // Records past their window are dropped as they are read.
     const all = asSent(JSON.parse(await $.fs.read(file)))
     return Object.fromEntries(Object.entries(all).filter(([, until]) => until > now))
+  } catch {
+    return {}
+  }
+}
+
+async function readNote($: EngineInterface, file: string): Promise<NoteUp> {
+  if (!(await $.fs.exists(file))) return {}
+  try {
+    const o = JSON.parse(await $.fs.read(file)) as Record<string, unknown>
+    const num = (v: unknown) => (typeof v === 'number' ? v : undefined)
+    return { until: num(o.until), tries: num(o.tries), retryAt: num(o.retryAt) }
   } catch {
     return {}
   }

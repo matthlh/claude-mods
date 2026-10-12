@@ -92,3 +92,58 @@ test('/limit-note instagram-login opens the profile and says what to do next', a
   expect(text).toContain('Sign in there yourself')
   expect(text).toContain('"instagram": true')
 })
+
+const NOTE_FILE = `${DIR}/note.json`
+const clears = (host: { scripts: string[][] }) => host.scripts.filter(a => a[0] === 'clear')
+
+test('once the limit resets the Note comes down, even in a session sitting idle', async ($: any, on: any) => {
+  const host = fakeHost(on, { [CONFIG]: config({ instagram: true }) })
+  const { measure } = await start($)
+  await measure([{ kind: 'five_hour', percentUsed: 99, resetsAt: FIVE }])
+  expect(JSON.parse(host.files.get(NOTE_FILE)!)).toEqual({ until: Date.parse(FIVE) })
+
+  // Nothing comes down before the reset; the timer finds it soon after.
+  await host.clock.set(Date.parse(FIVE) - 60_000)
+  expect(clears(host)).toEqual([])
+  await host.clock.advance(6 * 60_000)
+  expect(clears(host)).toEqual([['clear', '--chrome', '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome', '--profile', PROFILE]])
+  expect(JSON.parse(host.files.get(NOTE_FILE)!)).toEqual({})
+  expect(host.toasts).toContain('Your Claude limit reset: took your Instagram Note down.')
+
+  // Done once: later ticks and readings leave it.
+  await host.clock.advance(30 * 60_000)
+  await measure([{ kind: 'five_hour', percentUsed: 3, resetsAt: '2026-10-12T03:40:00Z' }])
+  expect(clears(host).length).toBe(1)
+})
+
+test('a failed take-down is tried three times, ten minutes apart, then left', async ($: any, on: any) => {
+  const host = fakeHost(on, { [CONFIG]: config({ instagram: true }) })
+  const { measure } = await start($)
+  await measure([{ kind: 'five_hour', percentUsed: 99, resetsAt: FIVE }])
+  host.script = { exitCode: 2, ok: false, reason: 'signed out of Instagram', steps: [] }
+  await host.clock.set(Date.parse(FIVE) + 60_000)
+  expect(clears(host).length).toBe(1)
+  await host.clock.advance(60 * 60_000)
+  expect(clears(host).length).toBe(3)
+  expect(JSON.parse(host.files.get(NOTE_FILE)!)).toEqual({})
+})
+
+test('a post that failed leaves nothing to take down', async ($: any, on: any) => {
+  const host = fakeHost(on, { [CONFIG]: config({ instagram: true }) })
+  host.script = { exitCode: 3, ok: false, reason: 'the inbox never showed your Note bubble', steps: [] }
+  const { measure } = await start($)
+  await measure([{ kind: 'five_hour', percentUsed: 99, resetsAt: FIVE }])
+  await host.clock.set(Date.parse(FIVE) + 30 * 60_000)
+  expect(clears(host)).toEqual([])
+})
+
+test('/limit-note test instagram clear stops before deleting; live deletes', async ($: any, on: any) => {
+  const host = fakeHost(on, { [CONFIG]: config() })
+  host.script = { exitCode: 0, ok: true, steps: ['Found "Delete note".', 'Dry run: stopped before deleting; your Note is still up.'] }
+  const { command } = await start($)
+  expect(await command('test instagram clear')).toContain('stopped before deleting')
+  expect(clears(host)[0]).toContain('--dry-run')
+  await command('test instagram clear live')
+  expect(clears(host)[1]).not.toContain('--dry-run')
+  expect(host.pushes).toEqual([])
+})
