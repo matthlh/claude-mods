@@ -56,7 +56,7 @@ test('a lock another session holds holds back; one left by a dead session is tak
   expect(host.pushes).toEqual([])
   expect(host.dirs.has(LOCK)).toBe(true)
 
-  await host.clock.advance(3 * 60_000)
+  await host.clock.advance(6 * 60_000)
   await measure([{ kind: 'five_hour', percentUsed: 100, resetsAt: FIVE }])
   expect(host.pushes.length).toBe(1)
   expect(host.dirs.has(LOCK)).toBe(false)
