@@ -1,10 +1,10 @@
 # claude-mods
 
-One marketplace (`matthlh`), four Claude Code plugins under `plugins/`: `pixel-cat` and `token-tycoon` are mods (function-hook plugins that draw above the prompt), `limit-note` is a mod that draws nothing (a phone push at 99% of the usage limits), `purple-dark` is a theme.
+One marketplace (`matthlh`), three Claude Code plugins under `plugins/`: `pixel-cat` and `token-tycoon` are mods (function-hook plugins that draw above the prompt), `purple-dark` is a theme.
 
 ## Rules
 
-- Never rename the marketplace (`matthlh`) or a plugin (`pixel-cat`, `token-tycoon`, `purple-dark`, `limit-note`). Users' installs and saved data are keyed on `<plugin>@matthlh`.
+- Never rename the marketplace (`matthlh`) or a plugin (`pixel-cat`, `token-tycoon`, `purple-dark`). Users' installs and saved data are keyed on `<plugin>@matthlh`.
 - Move files with plain `git mv` commits, content edits in separate commits, so rename detection carries other branches across.
 - Don't add a `CLAUDE.md` inside a plugin folder; the validator warns and it isn't loaded. This file is the only one.
 - Plain commit messages, no attribution trailers.
@@ -12,7 +12,7 @@ One marketplace (`matthlh`), four Claude Code plugins under `plugins/`: `pixel-c
 
 ## Branches
 
-`main` only moves by pull request. Each mod has a long-lived branch of its own, `pixel-cat`, `token-tycoon`, `purple-dark` and `limit-note`, and work on a mod goes there:
+`main` only moves by pull request. Each mod has a long-lived branch of its own, `pixel-cat`, `token-tycoon` and `purple-dark`, and work on a mod goes there:
 
 ```bash
 git checkout pixel-cat && git merge --ff-only origin/main   # start level with main
@@ -42,7 +42,6 @@ Try a plugin in a session with `claude --plugin-dir plugins/<name>` and `CLAUDE_
 - `plugins/<name>/.claude-plugin/plugin.json`: the plugin manifest. `.claude-plugin/types/` is generated and ignored.
 - `plugins/pixel-cat/hooks/engine/` is the lane machinery, `hooks/packs/<pack>/` is one character each (cat, adventurer). See its README for how to add a pack.
 - `plugins/purple-dark/themes/purple-dark.json` is the theme; plugin themes are read-only, shown in `/theme` under the file's `name`.
-- `plugins/limit-note/hooks/note.ts` is the pure part (which reading fires, the status text); `register.ts` holds everything that takes `$`, since the validator refuses `$` passed across an import. Its config, lock and sent record live in `~/.config/limit-note/`, never in the repo.
 
 ## How the mods talk to each other
 

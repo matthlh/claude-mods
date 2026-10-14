@@ -1,13 +1,12 @@
 # Claude Code mods by matthlh
 
-Four plugins for [Claude Code](https://claude.com/claude-code), served from one plugin marketplace: a pixel cat and an idle game that live above the prompt, a purple theme, and a phone alert for your usage limits.
+Three mods for [Claude Code](https://claude.com/claude-code), served from one plugin marketplace: a pixel cat and an idle game that live above the prompt, and a purple theme.
 
 | Plugin | What it is |
 | --- | --- |
 | [`pixel-cat`](plugins/pixel-cat) | A little pixel cat that wanders above the prompt, watches your usage limits and announces when work finishes. Not a cat person? Switch packs and an adventurer mines, chops trees and fights zombies there instead |
 | [`token-tycoon`](plugins/token-tycoon) | A Claude-themed idle game: prompt to earn tokens, hire agents, upgrade models and infra, and earn from your real Claude Code usage |
 | [`purple-dark`](plugins/purple-dark) | A purple dark colour theme |
-| [`limit-note`](plugins/limit-note) | Posts "Out of Claude Tokens; Ping me 3:40 pm PT pls" as your Instagram Note when your Claude limit reaches 99%, with a phone push. Spends no tokens |
 
 ## Install
 
@@ -18,7 +17,6 @@ You need a Claude Code version that supports mods (October 2026 or later). The s
 /plugin install pixel-cat@matthlh
 /plugin install token-tycoon@matthlh
 /plugin install purple-dark@matthlh
-/plugin install limit-note@matthlh
 ```
 
 Or from a shell:
@@ -52,7 +50,7 @@ You don't have to remember any commands. The cat's band has a **↻** button tha
 
 The same loop as commands, for when you'd rather type: `/mods` moves to the next stop, `/mods cat`, `/mods adventurer`, `/mods tycoon` or `/mods off` picks one. `/cat` and `/tycoon` show or hide one mod for this session without touching the loop, and `/idle` opens the Token Tycoon shop.
 
-The theme isn't part of the loop: pick **Purple Dark** in `/theme` once and it stays. Limit Note draws nothing, so it isn't part of the loop either.
+The theme isn't part of the loop: pick **Purple Dark** in `/theme` once and it stays.
 
 ## The mods
 
@@ -81,10 +79,6 @@ Cookie Clicker, but the cookie is a token. Prompt ⚡ to earn, hire agents that 
 ![Purple Dark: the prompt box, a user message and Claude's label in the theme colours](plugins/purple-dark/docs/preview.svg)
 
 A purple take on the dark theme: lavender accent, violet borders, deep purple message backgrounds. [Read more](plugins/purple-dark/README.md).
-
-### Limit Note ⏳
-
-When your 5-hour or weekly limit reaches 99%, it posts "Out of Claude Tokens; Ping me 3:40 pm PT pls" as your Instagram Note, the time being when the limit resets, and an [ntfy](https://ntfy.sh) push tells your phone. The Instagram post is opt-in; without it the push carries the text. It can also set your GitHub status. It fires once per limit window across every open session and only reads the usage numbers Claude Code already has, so it costs no tokens. Run `/limit-note setup`, subscribe to the topic it prints, then `/limit-note test`. [Read more](plugins/limit-note/README.md).
 
 ## Run from a clone
 
@@ -133,7 +127,6 @@ In an interactive session that loads the clone, saving a hooks file hot-reloads 
 plugins/pixel-cat/                hooks (engine + packs), tests, types, docs, README
 plugins/token-tycoon/             hooks, tests, types, docs, README
 plugins/purple-dark/              themes/purple-dark.json, docs, README
-plugins/limit-note/               hooks, tests, README
 ```
 
 ## License
